@@ -38,7 +38,7 @@ fun downloadImg(
 
 // simple heuristics for code block syntax highlighting
 fun guessCodeLanguage(code: String): String {
-    if (code.startsWith("$")) {
+    if (code.startsWith("$") || code.contains("mvn") || code.contains("curl")) {
         return "bash"
     } else if (code.contains(";")) {
         return "java"
@@ -192,6 +192,8 @@ fun imgToMd(
     return sb.toString()
 }
 
+// converts nested lists to md suc as table of contents
+// assumes structure dl -> .. -> dd -> dl -> ..
 fun dlToMd(
     list: Element,
     paddingSize: Int,
@@ -219,6 +221,8 @@ fun dlToMd(
     return sb.toString()
 }
 
+// coverts marked lists to md
+// assumes no nested structures
 fun ulToMd(list: Element): String {
     val sb = StringBuilder()
     var child = list.firstElementChild()
