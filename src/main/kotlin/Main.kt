@@ -79,12 +79,12 @@ fun aHrefToMd(elem: Element): String {
     return sb.toString()
 }
 
-fun codeToMd(elem: Element): String {
+fun codeToMd(code: Element): String {
     val sb = StringBuilder()
-    val code = elem.text()
+    val codeText = code.text()
     sb
-        .append("```${guessCodeLanguage(code)}\n")
-        .append(code)
+        .append("```${guessCodeLanguage(codeText)}\n")
+        .append(codeText)
         .append("\n```")
     return sb.toString()
 }
@@ -129,6 +129,7 @@ fun innerTextToMd(elem: Element): String {
         when (child) {
             is Element -> {
                 when (child.tagName()) {
+                    "p" -> sb.append(innerTextToMd(child))
                     "br" -> sb.append("\n")
                     "a" -> sb.append(aHrefToMd(child))
                     "span" -> sb.append(innerTextToMd(child))
@@ -148,21 +149,21 @@ fun innerTextToMd(elem: Element): String {
 
 // header conversion + link for md navigation
 fun headerToMd(
-    elem: Element,
+    header: Element,
     tag: String,
 ): String {
     val sb = StringBuilder()
 
-    val link = elem.selectFirst("a[name]")?.attr("name")
+    val link = header.selectFirst("a[name]")?.attr("name")
     if (link != null) {
         sb.append("<a id=\"${link}\"></a>\n")
     }
 
     when (tag) {
-        "h1" -> sb.append("# ").append(elem.text()).append("\n\n")
-        "h2" -> sb.append("## ").append(elem.text()).append("\n\n")
-        "h3" -> sb.append("### ").append(elem.text()).append("\n\n")
-        "h4" -> sb.append("#### ").append(elem.text()).append("\n\n")
+        "h1" -> sb.append("# ").append(header.text()).append("\n\n")
+        "h2" -> sb.append("## ").append(header.text()).append("\n\n")
+        "h3" -> sb.append("### ").append(header.text()).append("\n\n")
+        "h4" -> sb.append("#### ").append(header.text()).append("\n\n")
     }
 
     return sb.toString()
@@ -171,13 +172,13 @@ fun headerToMd(
 // downloads image into assets dir and links in md
 // if download fails src is inserted
 fun imgToMd(
-    elem: Element,
+    img: Element,
     assetsDir: Path,
 ): String {
     val sb = StringBuilder()
 
-    val altText = elem.attr("alt").trim().ifEmpty { "" }
-    val src = elem.absUrl("src").trim()
+    val altText = img.attr("alt").trim().ifEmpty { "" }
+    val src = img.absUrl("src").trim()
     val fileName = src.substringAfterLast("/")
 
     val result = downloadImg(src, assetsDir.resolve(fileName))
@@ -191,13 +192,51 @@ fun imgToMd(
     return sb.toString()
 }
 
+fun dlToMd(
+    list: Element,
+    paddingSize: Int,
+): String {
+    val sb = StringBuilder()
+    val padding = " ".repeat(paddingSize)
+
+    var child = list.firstElementChild()
+    while (child != null) {
+        if (child.tagName() == "dt") {
+            sb
+                .append(padding)
+                .append("- ")
+                .append(innerTextToMd(child))
+                .append("\n")
+        } else if (child.tagName() == "dd") {
+            val inner = child.firstElementChild()
+            if (inner != null && inner.tagName() == "dl") {
+                sb.append(dlToMd(inner, paddingSize + 2))
+            }
+        }
+        child = child.nextElementSibling()
+    }
+
+    return sb.toString()
+}
+
+fun ulToMd(list: Element): String {
+    val sb = StringBuilder()
+    var child = list.firstElementChild()
+    while (child != null) {
+        sb.append("- ").append(innerTextToMd(child)).append("\n")
+        child = child.nextElementSibling()
+    }
+
+    return sb.toString()
+}
+
 fun parseToMd(
     doc: Document,
     assetsDir: Path,
 ): String {
     val sb = StringBuilder()
 
-    val elements = doc.body().select("h1, h2, h3, h4, p, pre, dt, table, img")
+    val elements = doc.body().select("h1, h2, h3, h4, p, pre, dl, ul, table, img")
 
     for (elem in elements) {
         when (elem.tagName()) {
@@ -206,11 +245,17 @@ fun parseToMd(
             }
 
             "p" -> {
-                sb.append(innerTextToMd(elem)).append("\n\n")
+                if (elem.parent()?.tagName() != "li") {
+                    sb.append(innerTextToMd(elem)).append("\n\n")
+                }
             }
 
-            "dt" -> {
-                sb.append(innerTextToMd(elem)).append("\n\n")
+            "dl" -> {
+                sb.append(dlToMd(elem, 0)).append("\n")
+            }
+
+            "ul" -> {
+                sb.append(ulToMd(elem)).append("\n")
             }
 
             "pre" -> {
