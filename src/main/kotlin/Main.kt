@@ -251,7 +251,9 @@ fun parseToMd(
             }
 
             "dl" -> {
-                sb.append(dlToMd(elem, 0)).append("\n")
+                if (elem.parent()?.tagName() != "dd") {
+                    sb.append(dlToMd(elem, 0)).append("\n")
+                }
             }
 
             "ul" -> {
